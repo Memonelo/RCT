@@ -1,0 +1,1265 @@
+---
+title: "The economic consequences of increasing sleep"
+author: "Guillermo XR"
+date: '2022-06-10'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+
+
+
+# Librerias 
+
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(lmtest)
+library(sandwich)
+library(ivreg)
+library(dagitty)
+library(stargazer)
+library(plm)
+library(kableExtra)
+library(lubridate)
+library(gplots)
+library(did)
+library(haven)
+library(cowplot)
+library(GGally)
+library(ggpubr)
+
+
+
+
+
+## Cargar la base de datos
+
+setwd("d:/Users/guillermo_reza/Desktop/Maestría/Semestre Ene-Jun 2022/Taller Econometría Aplicada II/Práctica Final")
+datos <- read_dta("Angelucci_Cage_AEJMicro_dataset.dta")
+
+
+
+```
+
+
+# **Introducción**
+
+
+
+## Teoría de Cambio
+
+```{r}
+
+
+
+teoría_cambio <- g3 <-dagitty('dag{
+"Televisión" [pos="0,1"]
+"Programas" [pos="1,0"]
+"Barreras de Entrada" [pos="1,0.5"]
+"Transmisores" [pos="1,1.5"]
+"Targeting" [pos="1,2"]
+"Competencia" [pos="2,1"]
+"Disposición a Pagar" [pos="2,2"]
+"Ingresos Publicitarios" [pos="2,2.5"]
+"Precios" [pos="1,3"]
+"Calidad" [pos="2,3"]
+"Periodistas/newsroom" [pos="3,3"]
+"Televisión"->"Programas"->"Competencia"
+"Televisión"->"Transmisores"->"Competencia"
+"Televisión"->"Barreras de Entrada"->"Competencia"
+"Televisión"->"Targeting"->"Competencia"
+"Competencia"->"Disposición a Pagar"->"Ingresos Publicitarios"
+"Ingresos Publicitarios"->"Precios"
+"Ingresos Publicitarios"->"Calidad"
+"Ingresos Publicitarios"->"Periodistas/newsroom"
+}')
+plot(teoría_cambio)
+
+
+
+```
+
+
+
+## Dimensiones del Panel
+
+
+```{r}
+
+
+panel <-pdata.frame(datos,index=c("id_news","year"))
+
+
+
+#### ¿De qué tamaño es la muestra?
+
+
+## Dimensiones del Panel
+
+(pdim(panel))
+
+summary(panel$year)
+
+summary(panel$id_news)
+
+
+## Si se quiere tener un panel balanceado 
+
+# datos <- read_dta("Angelucci_Cage_AEJMicro_dataset.dta")
+
+# datos<- datos[!(datos$id_news==67),]
+
+# panel <-pdata.frame(datos,index=c("id_news","year"))
+
+# (pdim(panel))
+
+
+
+## Grupo Tratamiento 
+
+tabulate(panel$national)
+
+
+## Grupo Control 
+
+tabulate(panel$local)
+
+
+
+```
+
+
+
+
+## Tablas: Nacionales
+
+
+
+```{r}
+
+## TABLA 1: PERIÓDICOS NACIONALES
+
+variable_N <- c("Prices","Unit buyer price",
+             "Subscription price per issue",
+             "Display ad rate (listed price)",
+             " ", "Revenues and journalists",
+             "Total revenues (million)",
+             "Revenues from advertising (million)",
+             "Revenues from sales (million)",
+             "Share of advertising in total revenues (percent)",
+             "Number of journalists",
+             " ", "Circulation",
+             "Total circulation",
+             "Share of subscribers (percent)",
+             " ", "Content",
+             "Number of pages",
+             "Newshole (nonadvertising space)",
+             "Advertising space" )
+                                      
+                         
+                         
+Mean_N <- c(" ",mean(panel$po_cst[panel$national == 1],na.rm = TRUE),
+         mean(panel$ps_cst[panel$national == 1],na.rm = TRUE),
+         mean(panel$ads_p4_cst[panel$national == 1],na.rm = TRUE),
+         " ", " ",
+         mean(panel$rtotal_cst[panel$national == 1],na.rm = TRUE),
+         mean(panel$ra_cst[panel$national == 1],na.rm = TRUE),
+         mean(panel$rs_cst[panel$national == 1],na.rm = TRUE),
+         mean(panel$ra_s[panel$national == 1],na.rm = TRUE),
+         mean(panel$nb_journ[panel$national == 1],na.rm = TRUE),
+         " ", " ",mean(panel$qtotal[panel$national == 1],na.rm = TRUE),
+         mean(panel$qs_s[panel$national == 1],na.rm = TRUE),
+         " ", " ",
+         mean(panel$pages[panel$national == 1],na.rm = TRUE),
+         mean(panel$news_hole[panel$national == 1],na.rm = TRUE),
+         mean(panel$ads_q[panel$national == 1],na.rm = TRUE))                         
+                         
+                         
+Median_N <- c(" ",median(panel$po_cst[panel$national == 1],na.rm = TRUE),
+           median(panel$ps_cst[panel$national == 1],na.rm = TRUE),
+           median(panel$ads_p4_cst[panel$national == 1],na.rm = TRUE),
+           " ", " ",
+           median(panel$rtotal_cst[panel$national == 1],na.rm = TRUE),
+           median(panel$ra_cst[panel$national == 1],na.rm = TRUE),
+           median(panel$rs_cst[panel$national == 1],na.rm = TRUE),
+           median(panel$ra_s[panel$national == 1],na.rm = TRUE),
+           median(panel$nb_journ[panel$national == 1],na.rm = TRUE),
+           " ", " ",
+           median(panel$qtotal[panel$national == 1],na.rm = TRUE),
+           median(panel$qs_s[panel$national == 1],na.rm = TRUE),
+           " ", " ",
+           median(panel$pages[panel$national == 1],na.rm = TRUE),
+           median(panel$news_hole[panel$national == 1],na.rm = TRUE),
+           median(panel$ads_q[panel$national == 1],na.rm = TRUE))
+                         
+                         
+SD_N <- c(" ",sd(panel$po_cst[panel$national == 1],na.rm = TRUE),
+       sd(panel$ps_cst[panel$national == 1],na.rm = TRUE),
+       sd(panel$ads_p4_cst[panel$national == 1],na.rm = TRUE),
+       " ", " ",
+       sd(panel$rtotal_cst[panel$national == 1],na.rm = TRUE),
+       sd(panel$ra_cst[panel$national == 1],na.rm = TRUE),
+       sd(panel$rs_cst[panel$national == 1],na.rm = TRUE),
+       sd(panel$ra_s[panel$national == 1],na.rm = TRUE),
+       sd(panel$nb_journ[panel$national == 1],na.rm = TRUE),
+       " ", " ",
+       sd(panel$qtotal[panel$national == 1],na.rm = TRUE),
+       sd(panel$qs_s[panel$national == 1],na.rm = TRUE),
+       " ", " ",
+       sd(panel$pages[panel$national == 1],na.rm = TRUE),
+       sd(panel$news_hole[panel$national == 1],na.rm = TRUE),
+       sd(panel$ads_q[panel$national == 1],na.rm = TRUE))
+                         
+                         
+
+Min_N = c(" ",min(panel$po_cst[panel$national == 1],na.rm = TRUE),
+        min(panel$ps_cst[panel$national == 1],na.rm = TRUE),
+        min(panel$ads_p4_cst[panel$national == 1],na.rm = TRUE),
+        " ", " ",
+        min(panel$rtotal_cst[panel$national == 1],na.rm = TRUE),
+        min(panel$ra_cst[panel$national == 1],na.rm = TRUE),
+        min(panel$rs_cst[panel$national == 1],na.rm = TRUE),
+        min(panel$ra_s[panel$national == 1],na.rm = TRUE),
+        min(panel$nb_journ[panel$national == 1],na.rm = TRUE),
+        " ", " ",
+        min(panel$qtotal[panel$national == 1],na.rm = TRUE),
+        min(panel$qs_s[panel$national == 1],na.rm = TRUE),
+        " ", " ",
+        min(panel$pages[panel$national == 1],na.rm = TRUE),
+        min(panel$news_hole[panel$national == 1],na.rm = TRUE),
+        min(panel$ads_q[panel$national == 1],na.rm = TRUE))
+                         
+
+                         
+Max_N <- c(" ",max(panel$po_cst[panel$national == 1],na.rm = TRUE),
+        max(panel$ps_cst[panel$national == 1],na.rm = TRUE),
+        max(panel$ads_p4_cst[panel$national == 1],na.rm = TRUE),
+        " ", " ",
+        max(panel$rtotal_cst[panel$national == 1],na.rm = TRUE),
+        max(panel$ra_cst[panel$national == 1],na.rm = TRUE),
+        max(panel$rs_cst[panel$national == 1],na.rm = TRUE),
+        max(panel$ra_s[panel$national == 1],na.rm = TRUE),
+        max(panel$nb_journ[panel$national == 1],na.rm = TRUE),
+        " ", " ",
+        max(panel$qtotal[panel$national == 1],na.rm = TRUE),
+        max(panel$qs_s[panel$national == 1],na.rm = TRUE),
+        " ", " ",
+        max(panel$pages[panel$national == 1],na.rm = TRUE),
+        max(panel$news_hole[panel$national == 1],na.rm = TRUE),
+        max(panel$ads_q[panel$national == 1],na.rm = TRUE))
+                         
+                         
+
+ Observations_N <- c(" ",NROW(!is.na(panel$po_cst[panel$national == 1])),
+                     NROW(!is.na(panel$ps_cst[panel$national == 1])),
+                     NROW(!is.na(panel$ads_p4_cst[panel$national == 1])),
+                     " ", " ",
+                     NROW(!is.na(panel$rtotal_cst[panel$national == 1])),
+                     NROW(!is.na(panel$ra_cst[panel$national == 1])),
+                     NROW(!is.na(panel$rs_cst[panel$national == 1])),
+                     NROW(!is.na(panel$ra_s[panel$national == 1])),
+                     NROW(!is.na(panel$nb_journ[panel$national == 1])),
+                     " ", " ",
+                     NROW(!is.na(panel$qtotal[panel$national == 1])),
+                     NROW(!is.na(panel$qs_s[panel$national == 1])),
+                     " ", " ",
+                     NROW(!is.na(panel$pages[panel$national == 1])),
+                     NROW(!is.na(panel$news_hole[panel$national == 1])),
+                     NROW(!is.na(panel$ads_q[panel$national == 1])))
+
+ 
+ 
+## Tabla 1: Summary Statistics: National Daily Newspapers
+                         
+nacionales <- cbind(variable_N,Mean_N,Median_N,SD_N,Min_N,Max_N,Observations_N)
+
+stargazer(nacionales,type = "text")
+                         
+
+
+
+
+
+
+```
+
+
+
+
+## Tabla: Locales
+
+
+```{r}
+
+
+## TABLA 2: PERIÓDICOS LOCALES
+
+
+variable_L <- c("Prices","Unit buyer price",
+                "Subscription price per issue",
+                "Display ad rate (listed price)",
+                " ", "Revenues and journalists",
+                "Total revenues (million)",
+                "Revenues from advertising (million)",
+                "Revenues from sales (million)",
+                "Share of advertising in total revenues (percent)",
+                "Number of journalists",
+                " ", "Circulation",
+                "Total circulation",
+                "Share of subscribers (percent)",
+                " ", "Content",
+                "Number of pages",
+                "Newshole (nonadvertising space)",
+                "Advertising space" )
+
+
+
+Mean_L <- c(" ",mean(panel$po_cst[panel$national == 0],na.rm = TRUE),
+            mean(panel$ps_cst[panel$national == 0],na.rm = TRUE),
+            mean(panel$ads_p4_cst[panel$national == 0],na.rm = TRUE),
+            " ", " ",
+            mean(panel$rtotal_cst[panel$national == 0],na.rm = TRUE),
+            mean(panel$ra_cst[panel$national == 0],na.rm = TRUE),
+            mean(panel$rs_cst[panel$national == 0],na.rm = TRUE),
+            mean(panel$ra_s[panel$national == 0],na.rm = TRUE),
+            mean(panel$nb_journ[panel$national == 0],na.rm = TRUE),
+            " ", " ",mean(panel$qtotal[panel$national == 0],na.rm = TRUE),
+            mean(panel$qs_s[panel$national == 0],na.rm = TRUE),
+            " ", " ",
+            mean(panel$pages[panel$national == 0],na.rm = TRUE),
+            mean(panel$news_hole[panel$national == 0],na.rm = TRUE),
+            mean(panel$ads_q[panel$national == 0],na.rm = TRUE))                         
+
+
+Median_L <- c(" ",median(panel$po_cst[panel$national == 0],na.rm = TRUE),
+              median(panel$ps_cst[panel$national == 0],na.rm = TRUE),
+              median(panel$ads_p4_cst[panel$national == 0],na.rm = TRUE),
+              " ", " ",
+              median(panel$rtotal_cst[panel$national == 0],na.rm = TRUE),
+              median(panel$ra_cst[panel$national == 0],na.rm = TRUE),
+              median(panel$rs_cst[panel$national == 0],na.rm = TRUE),
+              median(panel$ra_s[panel$national == 0],na.rm = TRUE),
+              median(panel$nb_journ[panel$national == 0],na.rm = TRUE),
+              " ", " ",
+              median(panel$qtotal[panel$national == 0],na.rm = TRUE),
+              median(panel$qs_s[panel$national == 0],na.rm = TRUE),
+              " ", " ",
+              median(panel$pages[panel$national == 0],na.rm = TRUE),
+              median(panel$news_hole[panel$national == 0],na.rm = TRUE),
+              median(panel$ads_q[panel$national == 0],na.rm = TRUE))
+
+
+SD_L <- c(" ",sd(panel$po_cst[panel$national == 0],na.rm = TRUE),
+          sd(panel$ps_cst[panel$national == 0],na.rm = TRUE),
+          sd(panel$ads_p4_cst[panel$national == 0],na.rm = TRUE),
+          " ", " ",
+          sd(panel$rtotal_cst[panel$national == 0],na.rm = TRUE),
+          sd(panel$ra_cst[panel$national == 0],na.rm = TRUE),
+          sd(panel$rs_cst[panel$national == 0],na.rm = TRUE),
+          sd(panel$ra_s[panel$national == 0],na.rm = TRUE),
+          sd(panel$nb_journ[panel$national == 0],na.rm = TRUE),
+          " ", " ",
+          sd(panel$qtotal[panel$national == 0],na.rm = TRUE),
+          sd(panel$qs_s[panel$national == 0],na.rm = TRUE),
+          " ", " ",
+          sd(panel$pages[panel$national == 0],na.rm = TRUE),
+          sd(panel$news_hole[panel$national == 0],na.rm = TRUE),
+          sd(panel$ads_q[panel$national == 0],na.rm = TRUE))
+
+
+
+Min_L = c(" ",min(panel$po_cst[panel$national == 0],na.rm = TRUE),
+          min(panel$ps_cst[panel$national == 0],na.rm = TRUE),
+          min(panel$ads_p4_cst[panel$national == 0],na.rm = TRUE),
+          " ", " ",
+          min(panel$rtotal_cst[panel$national == 0],na.rm = TRUE),
+          min(panel$ra_cst[panel$national == 0],na.rm = TRUE),
+          min(panel$rs_cst[panel$national == 0],na.rm = TRUE),
+          min(panel$ra_s[panel$national == 0],na.rm = TRUE),
+          min(panel$nb_journ[panel$national == 0],na.rm = TRUE),
+          " ", " ",
+          min(panel$qtotal[panel$national == 0],na.rm = TRUE),
+          min(panel$qs_s[panel$national == 0],na.rm = TRUE),
+          " ", " ",
+          min(panel$pages[panel$national == 0],na.rm = TRUE),
+          min(panel$news_hole[panel$national == 0],na.rm = TRUE),
+          min(panel$ads_q[panel$national == 0],na.rm = TRUE))
+
+
+
+Max_L <- c(" ",max(panel$po_cst[panel$national == 0],na.rm = TRUE),
+           max(panel$ps_cst[panel$national == 0],na.rm = TRUE),
+           max(panel$ads_p4_cst[panel$national == 0],na.rm = TRUE),
+           " ", " ",
+           max(panel$rtotal_cst[panel$national == 0],na.rm = TRUE),
+           max(panel$ra_cst[panel$national == 0],na.rm = TRUE),
+           max(panel$rs_cst[panel$national == 0],na.rm = TRUE),
+           max(panel$ra_s[panel$national == 0],na.rm = TRUE),
+           max(panel$nb_journ[panel$national == 0],na.rm = TRUE),
+           " ", " ",
+           max(panel$qtotal[panel$national == 0],na.rm = TRUE),
+           max(panel$qs_s[panel$national == 0],na.rm = TRUE),
+           " ", " ",
+           max(panel$pages[panel$national == 0],na.rm = TRUE),
+           max(panel$news_hole[panel$national == 0],na.rm = TRUE),
+           max(panel$ads_q[panel$national == 0],na.rm = TRUE))
+
+
+
+Observations_L <- c(" ",NROW(!is.na(panel$po_cst[panel$national == 0])),
+                    NROW(!is.na(panel$ps_cst[panel$national == 0])),
+                    NROW(!is.na(panel$ads_p4_cst[panel$national == 0])),
+                    " ", " ",
+                    NROW(!is.na(panel$rtotal_cst[panel$national == 0])),
+                    NROW(!is.na(panel$ra_cst[panel$national == 0])),
+                    NROW(!is.na(panel$rs_cst[panel$national == 0])),
+                    NROW(!is.na(panel$ra_s[panel$national == 0])),
+                    NROW(!is.na(panel$nb_journ[panel$national == 0])),
+                    " ", " ",
+                    NROW(!is.na(panel$qtotal[panel$national == 0])),
+                    NROW(!is.na(panel$qs_s[panel$national == 0])),
+                    " ", " ",
+                    NROW(!is.na(panel$pages[panel$national == 0])),
+                    NROW(!is.na(panel$news_hole[panel$national == 0])),
+                    NROW(!is.na(panel$ads_q[panel$national == 0])))
+
+
+## Tabla 2: Summary Statistics: Local Daily Newspapers
+
+
+locales <- cbind(variable_L,Mean_L,Median_L,SD_L,Min_L,Max_L,Observations_L)
+
+stargazer(locales,type = "text")
+
+```
+
+
+
+
+
+# **Análisis de los Autores**
+
+
+## Gráfica de Ingresos Históricos
+
+```{r}
+
+
+panel_1<- datos %>%
+  mutate(revenues_millones=ra_cst/1000000) %>% 
+  filter(national == 1, !is.na(ra_cst)) %>%
+  group_by(year) %>% 
+  nest() %>% 
+  mutate(nacional_1 = map(data, ~sum(.x$revenues_millones,na.rm = TRUE))) %>% 
+  unnest(nacional_1)
+
+panel_2 <- datos %>%
+  mutate(revenues_millones=ra_cst/1000000) %>% 
+  filter(national == 0, !is.na(ra_cst)) %>%
+  group_by(year) %>% 
+  nest() %>% 
+  mutate(local_2 = map(data, ~sum(.x$revenues_millones,na.rm = TRUE))) %>% 
+  unnest(local_2)
+
+
+
+
+panel_3 <- inner_join(panel_2,panel_1,by = "year" )
+
+panel_3 <- panel_3 %>% mutate(Total = local_2 + nacional_1)
+
+
+ggplot(panel_3, aes(x=year)) + 
+  geom_line(aes(y= local_2), color = "darkred") +
+  geom_line(aes(y = nacional_1), color="steelblue") +
+  geom_line(aes(y = Total), color="green") +
+  geom_point(aes(y=local_2), shape = 19) +
+  geom_point(aes(y=nacional_1), shape = 17) +
+  geom_point(aes(y=Total), shape = 18) +
+  geom_vline(xintercept = 1967) +
+  annotate("text", x=1972, y=8500, label= "Ingresos Totales")+
+  annotate("text", x=1972, y=6000, label= "Periódicos Locales")+
+  annotate("text", x=1972, y=3200, label= "Periódicos Nacionales")+
+  annotate("text", x=1966, y=9000, label= "1967")+
+  labs(title="Ingresos por Publicidad por Tipo de Periódico ", 
+       subtitle="1960 - 1974 (millones de euros)", 
+       caption="Fuente: Angelucci & Cagé", 
+       y="Millones", x= "Año")
+
+
+```
+
+
+
+
+
+## Regresiones de Anuncios, Lectores y Calidad
+
+
+#### Anuncios
+
+
+```{r}
+
+
+reg1 <- plm(ln_ra_cst2 ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg1 <- vcovHC(reg1, type = "HC1")
+robust.se_reg1 <- sqrt(diag(cov_reg1))
+
+
+
+
+reg2 <- plm(ln_ads_p1_cst2 ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg2 <- vcovHC(reg2, type = "HC1")
+robust.se_reg2 <- sqrt(diag(cov_reg2))
+
+
+
+
+reg3 <- plm(ln_ads_p4_cst ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg3 <- vcovHC(reg3, type = "HC1")
+robust.se_reg3 <- sqrt(diag(cov_reg3))
+
+
+
+
+reg4 <- plm(ln_ads_q ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg4 <- vcovHC(reg4, type = "HC1")
+robust.se_reg4 <- sqrt(diag(cov_reg4))
+
+
+
+
+
+stargazer(reg1,reg2,reg3,reg4,se=list(robust.se_reg1,robust.se_reg2,robust.se_reg3,robust.se_reg4),
+          column.labels = c("Advertising revenues","Ad revenues/circulation","(Listed) ad Price","Advertising space"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+
+```
+
+
+
+#### Lectores
+
+```{r}
+
+
+reg5 <- plm(ln_ps_cst ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg5 <- vcovHC(reg5, type = "HC1")
+robust.se_reg5 <- sqrt(diag(cov_reg5))
+
+
+
+
+reg6 <- plm(ln_po_cst ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg6 <- vcovHC(reg6, type = "HC1")
+robust.se_reg6 <- sqrt(diag(cov_reg6))
+
+
+
+
+reg7 <- plm(ln_qtotal ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg7 <- vcovHC(reg7, type = "HC1")
+robust.se_reg7 <- sqrt(diag(cov_reg7))
+
+
+
+
+reg8 <- plm(ln_qs_s ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg8 <- vcovHC(reg8, type = "HC1")
+robust.se_reg8 <- sqrt(diag(cov_reg8))
+
+
+
+
+reg9 <- plm(ln_rs_cst ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg9 <- vcovHC(reg9, type = "HC1")
+robust.se_reg9 <- sqrt(diag(cov_reg9))
+
+
+
+
+stargazer(reg5,reg6,reg7,reg8,reg9,se=list(robust.se_reg5,robust.se_reg6,robust.se_reg7,robust.se_reg8,robust.se_reg9),
+          column.labels = c("Subscription price","Unit price","Circulation","Share of subscribers","Revenues from sales"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+
+```
+
+
+
+#### Calidad
+
+```{r}
+
+
+
+reg10 <- plm(ln_nb_journ ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg10 <- vcovHC(reg10, type = "HC1")
+robust.se_reg10 <- sqrt(diag(cov_reg10))
+
+
+
+
+reg11 <- plm(ln_av_payroll_cst ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg11 <- vcovHC(reg11, type = "HC1")
+robust.se_reg11 <- sqrt(diag(cov_reg11))
+
+
+
+
+reg12 <- plm(ln_pages ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg12 <- vcovHC(reg12, type = "HC1")
+robust.se_reg12 <- sqrt(diag(cov_reg12))
+
+
+
+
+reg13 <- plm(ln_news_hole ~ after_national, data=panel,
+            model ="within",effect = "twoways")
+cov_reg13 <- vcovHC(reg13, type = "HC1")
+robust.se_reg13 <- sqrt(diag(cov_reg13))
+
+
+
+
+reg14 <- plm(ln_share_Hard ~ after_national, data=panel,
+             model ="within",effect = "twoways")
+cov_reg14 <- vcovHC(reg14, type = "HC1")
+robust.se_reg14 <- sqrt(diag(cov_reg14))
+
+
+
+
+
+stargazer(reg10,reg11,reg12,reg13,reg14,
+          se=list(robust.se_reg10,robust.se_reg11,robust.se_reg12,robust.se_reg13,robust.se_reg14),
+          column.labels = c("Number of journalists","Average payroll","Number of pages","Newshole",
+                            "Share of hard news on front page (percent)"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+
+
+```
+
+
+
+## Tendencia Paralela Panel A-H
+
+
+#### Panel A
+
+```{r}
+
+
+Tiempo <- 1961:1974
+
+
+## Panel A
+
+
+reg1.1 <- plm(ln_ra_cst2 ~ factor(year)*national, data=panel,
+            model ="within",effect = "twoways")
+
+coef_PA <- reg1.1$coefficients
+int_PA <- confint(reg1.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PA <-data.frame(Tiempo, coef_PA,int_PA)
+
+PA_GRA <- ggplot(PA, aes(x=factor(Tiempo), y= coef_PA))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PA)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL A. Advertising revenues")
+
+
+```
+
+#### Panel B
+
+```{r}
+
+## Panel B
+
+
+reg3.1 <- plm(ln_ads_p4_cst ~ factor(year)*national, data=panel,
+              model ="within",effect = "twoways")
+
+coef_PB <- reg3.1$coefficients
+int_PB <- confint(reg3.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PB <-data.frame(Tiempo[3:14], coef_PB,int_PB)
+
+PB_GRA <- ggplot(PB, aes(x=factor(Tiempo), y= coef_PB))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo[3:14], 
+                 y = coef_PB)) + 
+  geom_linerange(aes(x = Tiempo[3:14], 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL B. Advertising price")
+
+```
+
+
+#### Panel C
+
+```{r}
+
+## Panel C
+
+
+reg5.1 <- plm(ln_ps_cst ~ factor(year)*national, data=panel,
+              model ="within",effect = "twoways")
+
+coef_PC <- reg5.1$coefficients
+int_PC <- confint(reg5.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PC <-data.frame(Tiempo, coef_PC,int_PC)
+
+PC_GRA <- ggplot(PC, aes(x=factor(Tiempo), y= coef_PC))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PC)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL C. Subscription price")
+
+```
+
+
+#### Panel D
+
+```{r}
+
+
+
+## Panel D
+
+
+reg7.1 <- plm(ln_qtotal ~ factor(year)*national, data=panel,
+              model ="within",effect = "twoways")
+
+coef_PD <- reg7.1$coefficients
+int_PD <- confint(reg7.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PD <-data.frame(Tiempo, coef_PD,int_PD)
+
+PD_GRA <- ggplot(PD, aes(x=factor(Tiempo), y= coef_PD))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PD)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL D. Circulation")
+
+
+
+```
+
+
+#### Panel E
+
+```{r}
+
+
+
+## Panel E
+
+
+reg10.1 <- plm(ln_nb_journ ~ factor(year)*national, data=panel,
+              model ="within",effect = "twoways")
+
+coef_PE <- reg10.1$coefficients
+int_PE <- confint(reg10.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PE <-data.frame(Tiempo, coef_PE,int_PE)
+
+PE_GRA <- ggplot(PE, aes(x=factor(Tiempo), y= coef_PE))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PE)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL E. Number of journalists")
+
+
+
+```
+
+
+
+#### Panel F
+
+```{r}
+
+## Panel F
+
+
+reg11.1 <- plm(ln_news_hole ~ factor(year)*national, data=panel,
+               model ="within",effect = "twoways")
+
+coef_PF <- reg11.1$coefficients
+int_PF <- confint(reg11.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PF <-data.frame(Tiempo, coef_PF,int_PF)
+
+PF_GRA <- ggplot(PF, aes(x=factor(Tiempo), y= coef_PF))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PF)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL F. Newshole")
+
+
+
+```
+
+
+#### Panel G
+
+```{r}
+
+
+
+## Panel G
+
+
+reg12.1 <- plm(R_sh_pcs_employes_ipo ~ factor(year)*national, data=panel,
+               model ="within",effect = "twoways")
+
+coef_PG <- reg12.1$coefficients
+int_PG <- confint(reg12.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PG <-data.frame(Tiempo, coef_PG,int_PG)
+
+PG_GRA <- ggplot(PG, aes(x=factor(Tiempo), y= coef_PG))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PG)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL G. Readership: Percent employees")
+
+
+
+
+```
+
+
+
+
+#### Panel H
+
+
+```{r}
+
+## Panel H
+
+
+reg13.1 <- plm(R_sh_pcs_agri_ouvriers_ipo ~ factor(year)*national, data=panel,
+               model ="within",effect = "twoways")
+
+coef_PH <- reg13.1$coefficients
+int_PH <- confint(reg13.1, level = 0.90) %>% 
+  data.frame() %>%  rename("conf.low_90" = "X5..",
+                           "conf.high_90" = "X95..")
+PH <-data.frame(Tiempo, coef_PH,int_PH)
+
+PH_GRA <- ggplot(PH, aes(x=factor(Tiempo), y= coef_PH))+
+  geom_vline(xintercept = 1966.5, 
+             colour = gray(1/2), lty = 2) +
+  geom_hline(yintercept=0)+
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  scale_x_continuous("National X Year", labels = as.character(Tiempo), breaks = Tiempo)+
+  labs(y = "") +
+  geom_point(aes(x = Tiempo, 
+                 y = coef_PH)) + 
+  geom_linerange(aes(x = Tiempo, 
+                     ymin =conf.low_90,
+                     ymax =conf.high_90),
+                 lwd = 1) +
+  ggtitle("PANEL H. Readership: Percent farmers and laborers")
+
+
+
+
+ggarrange(PA_GRA,PB_GRA,PC_GRA,PD_GRA,PE_GRA,PF_GRA,PG_GRA,PH_GRA,ncol = 2, nrow = 4)
+
+
+```
+
+
+
+
+## Pruebas de Robustez
+
+#### Prueba 2
+
+```{r}
+
+
+## Table D.2: Robustness check: Dropping 1968
+
+
+
+
+panel_robust_1 <-datos %>% filter(year != 1968) %>% 
+  pdata.frame(index=c("id_news","year"))
+
+
+
+reg1.a <- plm(ln_ra_cst2 ~ after_national, data=panel_robust_1,
+            model ="within",effect = "twoways")
+cov_reg1.a <- vcovHC(reg1.a, type = "HC1")
+robust.se_reg1.a <- sqrt(diag(cov_reg1.a))
+
+
+reg3.a <- plm(ln_ads_p4_cst ~ after_national, data=panel_robust_1,
+            model ="within",effect = "twoways")
+cov_reg3.a <- vcovHC(reg3.a, type = "HC1")
+robust.se_reg3.a <- sqrt(diag(cov_reg3.a))
+
+
+reg5.a <- plm(ln_ps_cst ~ after_national, data=panel_robust_1,
+            model ="within",effect = "twoways")
+cov_reg5.a <- vcovHC(reg5.a, type = "HC1")
+robust.se_reg5.a <- sqrt(diag(cov_reg5.a))
+
+
+
+reg8.a <- plm(ln_qs_s ~ after_national, data=panel_robust_1,
+            model ="within",effect = "twoways")
+cov_reg8.a <- vcovHC(reg8.a, type = "HC1")
+robust.se_reg8.a <- sqrt(diag(cov_reg8.a))
+
+
+
+reg10.a <- plm(ln_nb_journ ~ after_national, data=panel_robust_1,
+             model ="within",effect = "twoways")
+cov_reg10.a <- vcovHC(reg10.a, type = "HC1")
+robust.se_reg10.a <- sqrt(diag(cov_reg10.a))
+
+
+
+
+reg11.a <- plm(ln_av_payroll_cst ~ after_national, data=panel_robust_1,
+             model ="within",effect = "twoways")
+cov_reg11.a <- vcovHC(reg11.a, type = "HC1")
+robust.se_reg11.a <- sqrt(diag(cov_reg11.a))
+
+
+
+
+stargazer(reg1.a,reg3.a,reg5.a,reg8.a,reg10.a,reg11.a,
+          se=list(robust.se_reg1.a,robust.se_reg3.a,robust.se_reg5.a,
+                  robust.se_reg8.a,robust.se_reg10.a,robust.se_reg11.a),
+          column.labels = c("Advertising revenues","(Listed) Ad price","Subscription price",
+                            "Share of subscribers","Number of journalists","Newshole"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes','Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+
+```
+
+
+#### Prueba 3
+
+
+```{r}
+
+## Table D.3: Robustness check: Focusing on 1960-1971
+
+
+
+panel_robust_2 <-datos %>% filter(year <= 1971) %>% 
+  pdata.frame(index=c("id_news","year"))
+
+
+
+reg1.b <- plm(ln_ra_cst2 ~ after_national, data=panel_robust_2,
+              model ="within",effect = "twoways")
+cov_reg1.b <- vcovHC(reg1.b, type = "HC1")
+robust.se_reg1.b <- sqrt(diag(cov_reg1.b))
+
+
+reg3.b <- plm(ln_ads_p4_cst ~ after_national, data=panel_robust_2,
+              model ="within",effect = "twoways")
+cov_reg3.b <- vcovHC(reg3.b, type = "HC1")
+robust.se_reg3.b <- sqrt(diag(cov_reg3.b))
+
+
+reg5.b <- plm(ln_ps_cst ~ after_national, data=panel_robust_2,
+              model ="within",effect = "twoways")
+cov_reg5.b <- vcovHC(reg5.b, type = "HC1")
+robust.se_reg5.b <- sqrt(diag(cov_reg5.b))
+
+
+
+reg8.b <- plm(ln_qs_s ~ after_national, data=panel_robust_2,
+              model ="within",effect = "twoways")
+cov_reg8.b <- vcovHC(reg8.b, type = "HC1")
+robust.se_reg8.b <- sqrt(diag(cov_reg8.b))
+
+
+
+reg10.b <- plm(ln_nb_journ ~ after_national, data=panel_robust_2,
+               model ="within",effect = "twoways")
+cov_reg10.b <- vcovHC(reg10.b, type = "HC1")
+robust.se_reg10.b <- sqrt(diag(cov_reg10.b))
+
+
+
+
+reg11.b <- plm(ln_av_payroll_cst ~ after_national, data=panel_robust_2,
+               model ="within",effect = "twoways")
+cov_reg11.b <- vcovHC(reg11.b, type = "HC1")
+robust.se_reg11.b <- sqrt(diag(cov_reg11.b))
+
+
+
+
+stargazer(reg1.b,reg3.b,reg5.b,reg8.b,reg10.b,reg11.b,
+          se=list(robust.se_reg1.b,robust.se_reg3.b,robust.se_reg5.b,
+                  robust.se_reg8.b,robust.se_reg10.b,robust.se_reg11.b),
+          column.labels = c("Advertising revenues","(Listed) Ad price","Subscription price",
+                            "Share of subscribers","Number of journalists","Newshole"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes','Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+```
+
+
+
+#### Prueba 4
+
+```{r}
+
+
+
+## Table D.4: Robustness check: Focusing on 1964-1971
+
+
+
+
+panel_robust_3 <-datos %>% filter(year >= 1964 & year <= 1971) %>% 
+  pdata.frame(index=c("id_news","year"))
+
+
+
+reg1.c <- plm(ln_ra_cst2 ~ after_national, data=panel_robust_3,
+              model ="within",effect = "twoways")
+cov_reg1.c <- vcovHC(reg1.c, type = "HC1")
+robust.se_reg1.c <- sqrt(diag(cov_reg1.c))
+
+
+reg3.c <- plm(ln_ads_p4_cst ~ after_national, data=panel_robust_3,
+              model ="within",effect = "twoways")
+cov_reg3.c <- vcovHC(reg3.c, type = "HC1")
+robust.se_reg3.c <- sqrt(diag(cov_reg3.c))
+
+
+reg5.c <- plm(ln_ps_cst ~ after_national, data=panel_robust_3,
+              model ="within",effect = "twoways")
+cov_reg5.c <- vcovHC(reg5.c, type = "HC1")
+robust.se_reg5.c <- sqrt(diag(cov_reg5.c))
+
+
+
+reg8.c <- plm(ln_qs_s ~ after_national, data=panel_robust_3,
+              model ="within",effect = "twoways")
+cov_reg8.c <- vcovHC(reg8.c, type = "HC1")
+robust.se_reg8.c <- sqrt(diag(cov_reg8.c))
+
+
+
+reg10.c <- plm(ln_nb_journ ~ after_national, data=panel_robust_3,
+               model ="within",effect = "twoways")
+cov_reg10.c <- vcovHC(reg10.c, type = "HC1")
+robust.se_reg10.c <- sqrt(diag(cov_reg10.c))
+
+
+
+
+reg11.c <- plm(ln_av_payroll_cst ~ after_national, data=panel_robust_3,
+               model ="within",effect = "twoways")
+cov_reg11.c <- vcovHC(reg11.c, type = "HC1")
+robust.se_reg11.c <- sqrt(diag(cov_reg11.c))
+
+
+
+
+stargazer(reg1.c,reg3.c,reg5.c,reg8.c,reg10.c,reg11.c,
+          se=list(robust.se_reg1.c,robust.se_reg3.c,robust.se_reg5.c,
+                  robust.se_reg8.c,robust.se_reg10.c,robust.se_reg11.c),
+          column.labels = c("Advertising revenues","(Listed) Ad price","Subscription price",
+                            "Share of subscribers","Number of journalists","Newshole"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes','Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+```
+
+
+
+
+# **Análisis adicional**
+
+## Diferencias en Diferencias en Diferencias
+
+```{r}
+
+
+panel_DDD <-datos %>% mutate(after = if_else(year>=1967,1,0)) %>% 
+  pdata.frame(index=c("id_news","year"))
+
+
+
+reg1.d <- plm(ln_ra_cst2 ~ national + Had + after + national*Had + Had*after +
+                after_national + after_national*Had, data=panel_DDD,
+              model ="within",effect = "twoways")
+cov_reg1.d <- vcovHC(reg1.d, type = "HC1")
+robust.se_reg1.d <- sqrt(diag(cov_reg1.d))
+
+
+reg3.d <- plm(ln_ads_p4_cst ~ national + Had + after + national*Had + Had*after +
+                after_national + after_national*Had, data=panel_DDD,
+              model ="within",effect = "twoways")
+cov_reg3.d <- vcovHC(reg3.d, type = "HC1")
+robust.se_reg3.d <- sqrt(diag(cov_reg3.d))
+
+
+reg5.d <- plm(ln_ps_cst ~ national + Had + after + national*Had + Had*after +
+                after_national + after_national*Had, data=panel_DDD,
+              model ="within",effect = "twoways")
+cov_reg5.d <- vcovHC(reg5.d, type = "HC1")
+robust.se_reg5.d <- sqrt(diag(cov_reg5.d))
+
+
+
+reg8.d <- plm(ln_qs_s ~ national + Had + after + national*Had + Had*after +
+                after_national + after_national*Had, data=panel_DDD,
+              model ="within",effect = "twoways")
+cov_reg8.d <- vcovHC(reg8.d, type = "HC1")
+robust.se_reg8.d <- sqrt(diag(cov_reg8.d))
+
+
+
+reg10.d <- plm(ln_nb_journ ~ national + Had + after + national*Had + Had*after +
+                 after_national + after_national*Had, data=panel_DDD,
+               model ="within",effect = "twoways")
+cov_reg10.d <- vcovHC(reg10.d, type = "HC1")
+robust.se_reg10.d <- sqrt(diag(cov_reg10.d))
+
+
+
+
+reg11.d <- plm(ln_av_payroll_cst ~ national + Had + after + national*Had + Had*after +
+                 after_national + after_national*Had, data=panel_DDD,
+               model ="within",effect = "twoways")
+cov_reg11.d <- vcovHC(reg11.d, type = "HC1")
+robust.se_reg11.d <- sqrt(diag(cov_reg11.d))
+
+
+
+
+stargazer(reg1.d,reg3.d,reg5.d,reg8.d,reg10.d,reg11.d,
+          se=list(robust.se_reg1.d,robust.se_reg3.d,robust.se_reg5.d,
+                  robust.se_reg8.d,robust.se_reg10.d,robust.se_reg11.d),
+          column.labels = c("Advertising revenues","(Listed) Ad price","Subscription price",
+                            "Share of subscribers","Number of journalists","Newshole"),type="text",
+          add.lines=list(c('Newspaper fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes','Yes'),
+                         c('Year fixed effects', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes', 'Yes')))
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
